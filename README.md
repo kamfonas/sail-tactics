@@ -8,4 +8,4 @@ A second tab enables inputs to define the coordinates Northing(x) and Easting (y
 The course plot incorporates the following courses to get from A to B that are feasible:
 1. A direct course, if it is possible to sail in that direction
 2. A VMG course at angles that optimize the velocity-made-good along the direction of the wind for the port and starboard legs from A to the tack (or jibe) point and from there to B.
-3. A VMC course of a port and starboard leg at angles that optimize the velocity-made-good towards target B, the first leg starting from A and the second ending at B.
+3. A VMC course optimizing the velocity-made-good towards target B, which theoretically could be better than the VMG method, but it takes the boat further away from the target, and the optimal heading changes as the boat moves.
