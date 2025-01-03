@@ -33,19 +33,43 @@ app_ui = ui.page_fluid(
             "Course Optimization",
             ui.layout_sidebar(
                 ui.sidebar(
-                    ui.input_numeric("A_x", "Point A Northing (NMs)", value=8),
+                    ui.input_numeric("A_x", "Point A Northing (NMs)", value=0),
                     ui.input_numeric("A_y", "Point A Easting (NMs)", value=0),
-                    ui.input_numeric("B_x", "Point B Northing (NMs)", value=1),
+                    ui.input_numeric("B_x", "Point B Northing (NMs)", value=10),
                     ui.input_numeric("B_y", "Point B Easting (NMs)", value=0),
-                    ui.input_slider("TWD_opt", "True Wind Direction (°)", min=0, max=360, value=90),
-                    ui.input_slider("TWS", "True Wind Speed (knots)", min=0, max=50, value=15)
+                    # ui.input_slider("TWD_opt", "True Wind Direction (°)", min=0, max=360, value=90, step=5),
+                    # ui.input_slider("TWS", "True Wind Speed (knots)", min=6, max=24, value=15)
                 ),
                 ui.row(
-                    ui.column(6,ui.output_plot("course_plot", height="600px", width="100%"),),
-                    ui.column(6,ui.output_plot("optimized_polar_plot", height="600px", width="100%"),),
+                    ui.column(6,
+                        ui.div(
+                        ui.input_slider("TWD_opt", "", min=0, max=360, value=90, step=5),
+                        ui.tags.span("TWD (°):  ", id="slider-label", style="margin-left: 5px;"),
+                        style="display: flex; align-items: center;"
+                        ),
+                        ui.div(
+                        ui.input_slider("TWS", "", min=6, max=24, value=15),
+                        ui.tags.span("TWS (Kn):", id="slider-label", style="margin-left: 5px;"),
+                        style="display: flex; align-items: center;"
+                        ),
+                        # ui.input_slider("TWD_opt", "True Wind Direction (°)", min=0, max=360, value=90, step=5),
+                        ui.output_plot("course_plot", height="600px", width="100%"),),
+                    ui.column(6,
+                        ui.div(
+                        ui.input_slider("TWA_vmc1","", min=-30, max=+30, value=0,),
+                        ui.tags.span("Adjust VMC TWA 1 (°):", id="slider-label", style="margin-left: 5px;"),
+                        style="display: flex; align-items: center;"
+                        ),
+                        ui.div(
+                        ui.input_slider("TWA_vmc2","", min=-30, max=+30, value=0,),
+                        ui.tags.span("Adjust VMC TWA 2 (°):", id="slider-label", style="margin-left: 5px;"),
+                        style="display: flex; align-items: center;"
+                        ),
+                        ui.output_plot("optimized_polar_plot", height="600px", width="100%"),
+                        )
+                    )
                 )
-            )
-        )
+            ),
     ),
     # Fixed footer for the boat table
     ui.tags.div(
@@ -129,6 +153,8 @@ def server(input, output, session):
         if not polar_data:
             return None
 
+        # A = (0,0)
+        # B = (10,0)
         A = (input.A_x() or 0, input.A_y() or 0)  # Default to 0 if None
         B = (input.B_x() or 0, input.B_y() or 0)  # Default to 0 if None
 

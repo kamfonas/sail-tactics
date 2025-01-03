@@ -224,12 +224,16 @@ def calculate_tack_or_jibe(TWAs, SOWs, A, B, TWD):
     distance_AB = np.sqrt(delta_x**2 + delta_y**2)
     COG = (np.degrees(np.arctan2(delta_y, delta_x)) + 360) % 360  # Course over ground
 
+    if len(TWAs) == 0:
+        return None
+ 
     if len(TWAs) == 1:
         # Single leg case
         time = distance_AB / SOWs[0]
         return {
-            "total_distance": distance_AB,
-            "total_time": time,
+            "distances": [distance_AB],
+            "speeds":   [SOWs[0]],
+            "elapsedHrs": [time],
             "tack_point": None,
             "course": [(A[0], A[1]), (B[0], B[1])]
         }
@@ -267,14 +271,15 @@ def calculate_tack_or_jibe(TWAs, SOWs, A, B, TWD):
         total_time = time_leg1 + time_leg2
 
         return {
-            "total_distance": distance_leg1 + distance_leg2,
-            "total_time": total_time,
+            "distances": [distance_leg1, distance_leg2],
+            "speeds": [SOW1,SOW2],
+            "elapsedHrs": [time_leg1,time_leg2],
             "tack_point": tack_point,
             "course": [(A[0], A[1]), tack_point, (B[0], B[1])]
         }
 
     else:
-        raise ValueError("Invalid number of TWAs. Must be one or two.")
+        raise ValueError("Invalid number of TWAs. Must be none, one or two.")
 
 
 def plot_course_diagram_with_tack(A, B, TWD, polar_line, TWA_VMC):
@@ -299,39 +304,40 @@ def plot_course_diagram_with_tack(A, B, TWD, polar_line, TWA_VMC):
     speeds_full = speeds_full[sorted_indices]
 
     # Calculate VMG beat/run angles and speeds
-    _ix_up = np.argmax([np.cos(np.deg2rad(a))*s for a,s in zip(angles_full, speeds_full)])
-    _ix_down = np.argmin([np.cos(np.deg2rad(a))*s for a,s in zip(angles_full, speeds_full)])
-    beat_angle, beat_speed = angles_full[_ix_up], speeds_full[_ix_up]
-    run_angle, run_speed   = angles_full[_ix_down], speeds_full[_ix_down]
-
-    if 0 <= TWA_VMC < beat_angle:
-        TWA_vmg = [beat_angle, 360-beat_angle]
-        SOW_vmg = [beat_speed, beat_speed]
-    elif 360-beat_angle < TWA_VMC < 360:
-        TWA_vmg = [360-beat_angle, beat_angle]
-        SOW_vmg = [beat_speed, beat_speed]
-    elif run_angle < TWA_VMC <= 180:
-        TWA_vmg = [run_angle, 360-run_angle]
-        SOW_vmg = [run_speed, run_speed]
-    elif 360-run_angle < TWA_VMC < 180:
-        TWA_vmg = [360-run_angle, run_angle]
-        SOW_vmg = [run_speed, run_speed]
-    else:
-        TWA_vmg = []
-        SOW_vmg = []
+    _ix_up = np.argmax([np.cos(np.deg2rad(a))*s for a,s in zip(angles_port, speeds_port)])
+    _ix_down = np.argmin([np.cos(np.deg2rad(a))*s for a,s in zip(angles_port, speeds_port)])
+    beat_angle_port, beat_speed_port = angles_port[_ix_up], speeds_port[_ix_up]
+    run_angle_port, run_speed_port   = angles_port[_ix_down], speeds_port[_ix_down]
+    beat_angle_starboard = 360-beat_angle_port
+    run_angle_starboard  = 360-run_angle_port
 
     # Single leg direct to the target where possible
     direct_twa = (COG - TWD + 360) % 360  # TWA for the direct course
-    _idx = np.searchsorted(angles_full, direct_twa, side="left") - 1
-    if 0 <= _idx < len(angles_full) - 1:
-        direct_sow = speeds_full[_idx]
+    port_equivalent_direct_twa = ((360 - direct_twa) if direct_twa > 180 else direct_twa) % 360 
+
+    _idx = np.searchsorted(angles_port, port_equivalent_direct_twa, side="left") - 1
+    if 0 <= _idx < len(angles_port) - 1:
+        direct_sow = speeds_port[_idx]
     else:
         direct_sow = 0  # No valid direct course
 
-    elapsed_time = distance_AB / direct_sow if direct_sow > 0 else float('inf')
 
+    elapsed_time = distance_AB / direct_sow if direct_sow > 0 else float('inf')
+    
+    # VMG Method   
+    if  TWA_VMC >= beat_angle_starboard or TWA_VMC <= beat_angle_port:
+        vmg_best_path = calculate_tack_or_jibe([beat_angle_port, beat_angle_starboard], [beat_speed_port, beat_speed_port], A, B, TWD)
+    elif run_angle_port < TWA_VMC < 360 - run_angle_port:
+        vmg_best_path = calculate_tack_or_jibe([run_angle_port, run_angle_starboard],  [run_speed_port, run_speed_port], A, B, TWD)
+    else:
+        vmg_best_path = None
+    print("vmg_best_path:",vmg_best_path)
+
+    # method VMC-fixed
     best_twa, best_sow = find_optimal_vmc((angles_full, speeds_full), TWA_VMC)
 
+    # method VMC-adapt
+    
     # Plot the course diagram
     plt.figure(figsize=(8, 8))
 
@@ -345,9 +351,26 @@ def plot_course_diagram_with_tack(A, B, TWD, polar_line, TWA_VMC):
     plt.text(B[1], B[0], "B", fontsize=12, color="red", ha="left")
 
     # Add wind direction arrow
-    wind_dx = 5 * np.sin(np.radians(TWD))
-    wind_dy = 5 * np.cos(np.radians(TWD))
-    plt.arrow(A[1], A[0], wind_dx, wind_dy, head_width=0.5, head_length=0.7, fc="green", ec="green", label="True Wind Direction")
+    wind_dx = 2 * np.sin(np.radians(TWD))
+    wind_dy = 2 * np.cos(np.radians(TWD))
+    plt.arrow(6, 2, wind_dx, wind_dy, head_width=0.5, head_length=0.5, width=0.1, fc="green", ec="green", label="True Wind Direction")
+
+    # VMG Method
+    if vmg_best_path:
+        leg1_dist = vmg_best_path["distances"][0]
+        leg2_dist = vmg_best_path["distances"][1]
+        leg1_time = vmg_best_path["elapsedHrs"][0]
+        leg2_time = vmg_best_path["elapsedHrs"][1]
+        leg1_speed = vmg_best_path['speeds'][0]
+        leg2_speed = vmg_best_path['speeds'][1]
+        T  = vmg_best_path["tack_point"]
+        print("VMG 2-leg via",T)
+        print("vmg dist",leg1_dist+leg2_dist)
+        print("vmg_time",leg1_time+leg2_time)
+        plt.scatter([T[1]], [T[0]], color="blue", label="T")
+        plt.plot([A[1], T[1]], [A[0], T[0]], linestyle="--", color="blue", label=f"vmg-leg1 {leg1_dist:.2f} Nm @ {leg1_speed:.2f} Kn, {leg1_time:.2f} Hrs")
+        plt.plot([T[1],B[1]], [T[0], B[0]], linestyle="--", color="blue", label=f"vmg-leg2 {leg2_dist:.2f} Nm @ {leg2_speed:.2f} Kn, {leg2_time:.2f} Hrs")
+
 
     # Annotate direct course speed and elapsed time
     if direct_sow > 0:
@@ -356,7 +379,8 @@ def plot_course_diagram_with_tack(A, B, TWD, polar_line, TWA_VMC):
                 fontsize=8, color="purple")
         print(f"Direct Course:\nSOW: {direct_sow:.2f} knots\nElapsed Time: {elapsed_time:.2f} hrs")
     plt.axis("equal")
-    plt.legend()
+    # plt.legend()
+    plt.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=1, fontsize=10)  # Move legend below the plot
     plt.xlabel("Easting")
     plt.ylabel("Northing")
     plt.grid()
@@ -456,7 +480,7 @@ def plot_polar_diagram(polar_line, TWA_VMC, TWS):
 
         # Tangent Line
         ax.plot([np.radians(best_twa), np.radians(TWA_VMC)], [best_sow, vmc_line_length],
-                linestyle=":", color=color, label=f"{label_prefix} Optimal Heading (TWA={best_twa:.2f}°)")
+                linestyle="--", color=color, label=f"{label_prefix} Optimal Heading (TWA={best_twa:.2f}°)")
 
     # Port Tack
     plot_vmc_and_tangent(ax, TWA_VMC, best_twa_port, best_sow_port, best_vmc_port, "orange", "Port Tack")
