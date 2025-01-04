@@ -325,10 +325,14 @@ def plot_course_diagram_with_tack(A, B, TWD, polar_line, TWA_VMC):
     elapsed_time = distance_AB / direct_sow if direct_sow > 0 else float('inf')
     
     # VMG Method   
-    if  TWA_VMC >= beat_angle_starboard or TWA_VMC <= beat_angle_port:
+    if  TWA_VMC <= beat_angle_port:
         vmg_best_path = calculate_tack_or_jibe([beat_angle_port, beat_angle_starboard], [beat_speed_port, beat_speed_port], A, B, TWD)
-    elif run_angle_port < TWA_VMC < 360 - run_angle_port:
-        vmg_best_path = calculate_tack_or_jibe([run_angle_port, run_angle_starboard],  [run_speed_port, run_speed_port], A, B, TWD)
+    elif  TWA_VMC >= beat_angle_starboard:
+        vmg_best_path = calculate_tack_or_jibe([ beat_angle_starboard,beat_angle_port], [beat_speed_port, beat_speed_port], A, B, TWD)
+    elif run_angle_port < TWA_VMC <= 180:
+        vmg_best_path = calculate_tack_or_jibe([run_angle_port,run_angle_starboard],  [run_speed_port, run_speed_port], A, B, TWD)
+    elif 180 < TWA_VMC < 360 - run_angle_port:
+        vmg_best_path = calculate_tack_or_jibe([run_angle_starboard,run_angle_port],  [run_speed_port, run_speed_port], A, B, TWD)
     else:
         vmg_best_path = None
     print("vmg_best_path:",vmg_best_path)

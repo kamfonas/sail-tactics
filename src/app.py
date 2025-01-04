@@ -43,7 +43,7 @@ app_ui = ui.page_fluid(
                 ui.row(
                     ui.column(6,
                         ui.div(
-                        ui.input_slider("TWD_opt", "", min=0, max=360, value=90, step=5),
+                        ui.input_slider("TWD_opt", "", min=0, max=360, value=315, step=5),
                         ui.tags.span("TWD (°):  ", id="slider-label", style="margin-left: 5px;"),
                         style="display: flex; align-items: center;"
                         ),
