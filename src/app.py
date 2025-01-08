@@ -45,29 +45,29 @@ app_ui = ui.page_fluid(
                 ui.row(
                     ui.column(6,
                         ui.div(
+                        ui.tags.span("Adjust TWD (°):  ", id="slider-label", style="margin-left: 5px;"),
                         ui.input_slider("TWD_opt", "", min=0, max=360, value=315, step=5),
-                        ui.tags.span("TWD (°):  ", id="slider-label", style="margin-left: 5px;"),
-                        style="display: flex; align-items: center;"
-                        ),
-                        ui.div(
-                        ui.input_slider("TWS", "", min=6, max=24, value=15),
-                        ui.tags.span("TWS (Kn):", id="slider-label", style="margin-left: 5px;"),
                         style="display: flex; align-items: center;"
                         ),
                         # ui.input_slider("TWD_opt", "True Wind Direction (°)", min=0, max=360, value=90, step=5),
-                        ui.output_plot("course_plot", height="800px", width="100%"),),
+                        ui.output_plot("course_plot", height="850px", width="100%"),),
                     ui.column(6,
                         ui.div(
-                        ui.input_slider("TWA_vmc1","", min=-30, max=+30, value=0,),
-                        ui.tags.span("Adjust VMC TWA 1 (°):", id="slider-label", style="margin-left: 5px;"),
+                        ui.tags.span("Adjust TWS (Kn):", id="slider-label", style="margin-left: 5px;"),
+                        ui.input_slider("TWS", "", min=6, max=24, value=15),
                         style="display: flex; align-items: center;"
                         ),
-                        ui.div(
-                        ui.input_slider("TWA_vmc2","", min=-30, max=+30, value=0,),
-                        ui.tags.span("Adjust VMC TWA 2 (°):", id="slider-label", style="margin-left: 5px;"),
-                        style="display: flex; align-items: center;"
-                        ),
-                        ui.output_plot("optimized_polar_plot", height="800px", width="100%"),
+                        # ui.div(
+                        # ui.input_slider("TWA_vmc1","", min=-30, max=+30, value=0,),
+                        # ui.tags.span("Adjust VMC TWA 1 (°):", id="slider-label", style="margin-left: 5px;"),
+                        # style="display: flex; align-items: center;"
+                        # ),
+                        # ui.div(
+                        # ui.input_slider("TWA_vmc2","", min=-30, max=+30, value=0,),
+                        # ui.tags.span("Adjust VMC TWA 2 (°):", id="slider-label", style="margin-left: 5px;"),
+                        # style="display: flex; align-items: center;"
+                        # ),
+                        ui.output_plot("optimized_polar_plot", height="850px", width="100%"),
                         )
                     )
                 )
