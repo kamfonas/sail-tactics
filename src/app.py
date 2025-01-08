@@ -10,7 +10,9 @@ from sailutils import (
     plot_half_polar_data_cubicSpline,
     plot_course_diagram_with_tack,
     interpolate_polar_curve,
-    plot_polar_diagram
+    plot_polar_diagram,
+    preprocess_polar_data,
+    calc_vmc_results
 )
 
 app_ui = ui.page_fluid(
@@ -53,7 +55,7 @@ app_ui = ui.page_fluid(
                         style="display: flex; align-items: center;"
                         ),
                         # ui.input_slider("TWD_opt", "True Wind Direction (°)", min=0, max=360, value=90, step=5),
-                        ui.output_plot("course_plot", height="600px", width="100%"),),
+                        ui.output_plot("course_plot", height="800px", width="100%"),),
                     ui.column(6,
                         ui.div(
                         ui.input_slider("TWA_vmc1","", min=-30, max=+30, value=0,),
@@ -65,7 +67,7 @@ app_ui = ui.page_fluid(
                         ui.tags.span("Adjust VMC TWA 2 (°):", id="slider-label", style="margin-left: 5px;"),
                         style="display: flex; align-items: center;"
                         ),
-                        ui.output_plot("optimized_polar_plot", height="600px", width="100%"),
+                        ui.output_plot("optimized_polar_plot", height="800px", width="100%"),
                         )
                     )
                 )
@@ -173,13 +175,8 @@ def server(input, output, session):
         distance_AB = np.sqrt(delta_x**2 + delta_y**2)
         COG = (np.degrees(np.arctan2(delta_y, delta_x)) + 360) % 360  # Course over ground
 
-        # geod = Geod(ellps="WGS84")
-        # fwd_azimuth, _, distance = geod.inv(A[1], A[0], B[1], B[0])  # Northing (latitude) first
-        # COG = (fwd_azimuth + 360) % 360  # Normalize to 0-360 degrees
         TWA_VMC = (COG - TWD + 360) % 360
-        # if TWA_VMC > 180:
-        #     TWA_VMC = 360 - TWA_VMC  # Reflect for polar symmetry
-
+    
         # Convert distance to nautical miles
         distance_nm = distance_AB
 
@@ -191,8 +188,28 @@ def server(input, output, session):
             "TWD": TWD,
             "TWS": TWS,
             "TWA_VMC": TWA_VMC,
-            "distance_nm": distance_nm,
+            "distance_nm": distance_AB,
         }
+
+    @reactive.Calc
+    def polars():
+        vars = common_variables()
+        polar_line = interpolate_polar_curve(vars["polar_data"], vars["TWS"])
+        res = preprocess_polar_data(polar_line, vars['TWD'])
+        return {"polar_line": polar_line, 
+                "angles_full_rad": res["angles_full_rad"],
+                'speeds_full':  res["speeds_full"],
+                "bearings_full_rad": res["bearings_full_rad"]
+        }
+
+    @reactive.Calc
+    def vmc_results():
+        vars = common_variables()
+        pol = polars()
+        vmc_res = calc_vmc_results(pol, vars['A'], vars['B'], vars['TWA_VMC'])
+        # Combine results
+        return vmc_res
+
 
     @output
     @render.plot
@@ -200,11 +217,18 @@ def server(input, output, session):
         vars = common_variables()
         if not vars:
             return
+        pol = polars()
+        if not pol:
+            return
+        vmc_data = vmc_results()
+        if not vmc_data:
+            return
 
         plot_course_diagram_with_tack(
             vars["A"], vars["B"], vars["TWD"],
-            interpolate_polar_curve(vars["polar_data"], vars["TWS"]),
+            pol['polar_line'],
             vars["TWA_VMC"],
+            vmc_data
             # vars["distance_nm"]
         )
 
@@ -214,11 +238,18 @@ def server(input, output, session):
         vars = common_variables()
         if not vars:
             return
+        pol = polars()
+        if not pol:
+            return
+        vmc_data = vmc_results()
+        if not vmc_data:
+            return
 
         plot_polar_diagram(
-            interpolate_polar_curve(vars["polar_data"], vars["TWS"]),
+            pol['polar_line'],
             vars["TWA_VMC"],
-            vars["TWS"]
+            vars["TWS"],
+            vmc_data
         )
 
 
