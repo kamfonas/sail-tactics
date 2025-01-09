@@ -1,5 +1,7 @@
 # sail-tactics
 
+Note: Forgive the untidiness. This project is in progress and incomplete. 
+
 ## Introduction
 We compare various methods of optimizing the track from point A to point B using the VMG/VMC and polar diagrams. 
 We reformatted the 2024 ORC indicative and polar plot (VPP) data from https://github.com/jieter/orc-data. We load all of them in a table at the bottom of the screen and provide a rudimentary way of filtering by various columns (sail number, name, builder, type, year, LOA, Draft, etc.). 
