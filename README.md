@@ -1,6 +1,6 @@
 # sail-tactics
 
-Remember that this project is under development and incomplete, so please forgive the untidy and messy coding. 
+Remember that this project is under development and incomplete; forgive our untidy code. 
 
 ## Introduction
 We compare various methods of optimizing the track from point A to point B using the VMG/VMC and polar diagrams. 
