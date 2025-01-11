@@ -16,3 +16,8 @@ More specifically, the following optimization methods for the course A to B are 
 
 We currently assume fixed wind direction and speed, and we ignore tides and leeway drag effects. We plan to extend to those areas later.
 
+## Application Access ##
+
+A current dev version of the app can be found [here](https://www.shinyapps.io/admin/#/application/13662471). 
+
+
