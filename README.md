@@ -14,5 +14,5 @@ More specifically, the following optimization methods for the course A to B are 
 4. A VMC adaptive course (under development) addresses the issue described in 3 above. This approach builds the route in small consecutive increments optimized based on the latest boat position until it converges with the VMG-optimized TWA, and it reverts to a VMG method for the rest of leg1.  
 5. A dynamically optimized route (under development) uses intelligently selected pairs of angles for the two legs, and combines random exploration of new values with exploitation of knowledge obtained in previous trials to converge to optimal angles that minimize the total time.
 
-We currently assume fixed wind direction and speed, and we ignore tides and leeway effects. We plan to extend to those areas later.
+We currently assume fixed wind direction and speed, and we ignore tides and leeway drag effects. We plan to extend to those areas later.
 
