@@ -28,7 +28,14 @@ app_ui = ui.page_fluid(
                     ),
                     # ui.input_slider("TWD", "TWD", 0, 360, 72)
                 ),
-                ui.output_plot("polar_plot")
+                ui.row(
+                    ui.column(6,
+                            ui.output_text_verbatim("boatData")
+                            ),
+                    ui.column(6,
+                        ui.output_plot("polar_plot")
+                          )                    
+                )
             )
         ),
         ui.nav_panel(
@@ -39,7 +46,7 @@ app_ui = ui.page_fluid(
                     ui.input_numeric("A_y", "Point A Easting (NMs)", value=0),
                     ui.input_numeric("B_x", "Point B Northing (NMs)", value=10),
                     ui.input_numeric("B_y", "Point B Easting (NMs)", value=0),
-                    # ui.input_slider("TWD_opt", "True Wind Direction (°)", min=0, max=360, value=90, step=5),
+                    ui.input_numeric("twa_margin", "Min leg-to-Course angle (°)", min=0, max=5, value=2, step=0.5),
                     # ui.input_slider("TWS", "True Wind Speed (knots)", min=6, max=24, value=15)
                 ),
                 ui.row(
@@ -57,16 +64,6 @@ app_ui = ui.page_fluid(
                         ui.input_slider("TWS", "", min=6, max=24, value=15),
                         style="display: flex; align-items: center;"
                         ),
-                        # ui.div(
-                        # ui.input_slider("TWA_vmc1","", min=-30, max=+30, value=0,),
-                        # ui.tags.span("Adjust VMC TWA 1 (°):", id="slider-label", style="margin-left: 5px;"),
-                        # style="display: flex; align-items: center;"
-                        # ),
-                        # ui.div(
-                        # ui.input_slider("TWA_vmc2","", min=-30, max=+30, value=0,),
-                        # ui.tags.span("Adjust VMC TWA 2 (°):", id="slider-label", style="margin-left: 5px;"),
-                        # style="display: flex; align-items: center;"
-                        # ),
                         ui.output_plot("optimized_polar_plot", height="850px", width="100%"),
                         )
                     )
@@ -134,7 +131,30 @@ def server(input, output, session):
             return None
         return boats[selected_index[0]]
 
-
+    @output
+    @render.text
+    def boatData():
+        boat = selected_boat()
+        if boat is None:
+            return
+        txt=""
+        txt += f"Sail Number: {boat['sailnumber']}\n"
+        txt += f"Name: {boat['name']}\n"
+        txt += f"Sail Number: {boat['boat']['builder']}\n"
+        txt += f"Sail Number: {boat['boat']['type']}\n"
+        txt += f"Designer: {boat['boat']['designer']}\n"
+        txt += f"Year: {boat['boat']['year']}\n"
+        txt += f"LOA: {boat['boat']['sizes']['loa']}\n"
+        txt += f"Beam: {boat['boat']['sizes']['beam']}\n"
+        txt += f"Draft: {boat['boat']['sizes']['draft']}\n"
+        txt += f"Displacement: {boat['boat']['sizes']['displacement']}\n"
+        txt += f"Genoa: {boat['boat']['sizes']['genoa']}\n"
+        txt += f"Main Sail: {boat['boat']['sizes']['main']}\n"
+        txt += f"Spinnaker: {boat['boat']['sizes']['spinnaker']}\n"
+        txt += f"Crew: {boat['boat']['sizes']['crew']}\n"
+        txt += f"Wetted Surface: {boat['boat']['sizes']['wetted_surface']}\n"
+        return txt               
+    
     @output
     @render.plot
     def polar_plot():
@@ -159,6 +179,7 @@ def server(input, output, session):
         # B = (10,0)
         A = (input.A_x() or 0, input.A_y() or 0)  # Default to 0 if None
         B = (input.B_x() or 0, input.B_y() or 0)  # Default to 0 if None
+        margin = input.twa_margin()
 
         # # Ensure A and B are not identical in any dimension
         # if A[0] == B[0]:
@@ -189,6 +210,7 @@ def server(input, output, session):
             "TWS": TWS,
             "TWA_VMC": TWA_VMC,
             "distance_nm": distance_AB,
+            "margin": margin
         }
 
     @reactive.Calc
@@ -199,16 +221,17 @@ def server(input, output, session):
         return {"polar_line": polar_line, 
                 "angles_full_rad": res["angles_full_rad"],
                 'speeds_full':  res["speeds_full"],
-                "bearings_full_rad": res["bearings_full_rad"]
+                "bearings_full_rad": res["bearings_full_rad"],
         }
 
     @reactive.Calc
     def vmc_results():
         vars = common_variables()
         pol = polars()
-        vmc_res = calc_vmc_results(pol, vars['A'], vars['B'], vars['TWA_VMC'])
+        vmc_res = calc_vmc_results(pol, vars['A'], vars['B'], vars['TWA_VMC'],margin=vars['margin'])
         # Combine results
         return vmc_res
+
 
 
     @output
@@ -223,12 +246,11 @@ def server(input, output, session):
         vmc_data = vmc_results()
         if not vmc_data:
             return
-
         plot_course_diagram_with_tack(
             vars["A"], vars["B"], vars["TWD"],
             pol['polar_line'],
             vars["TWA_VMC"],
-            vmc_data
+            vmc_data,
             # vars["distance_nm"]
         )
 
@@ -249,7 +271,8 @@ def server(input, output, session):
             pol['polar_line'],
             vars["TWA_VMC"],
             vars["TWS"],
-            vmc_data
+            vmc_data,
+            margin=vars['margin']
         )
 
 
