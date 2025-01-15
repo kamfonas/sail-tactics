@@ -46,7 +46,7 @@ app_ui = ui.page_fluid(
                     ui.input_numeric("A_y", "Point A Easting (NMs)", value=0),
                     ui.input_numeric("B_x", "Point B Northing (NMs)", value=10),
                     ui.input_numeric("B_y", "Point B Easting (NMs)", value=0),
-                    ui.input_numeric("twa_margin", "Min leg-to-Course angle (°)", min=0, max=5, value=2, step=0.5),
+                    ui.input_numeric("twa_margin", "Angle Margin (°)", min=0, max=15, value=10, step=0.5),
                     # ui.input_slider("TWS", "True Wind Speed (knots)", min=6, max=24, value=15)
                 ),
                 ui.row(

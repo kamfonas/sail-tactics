@@ -135,8 +135,12 @@ def plot_half_polar_data_cubicSpline(boat, polar_data):
         angles = [point[0] for point in vmg_line]
         speeds = [point[1] for point in vmg_line]
 
+        # remove items with whith duplicate angles
+        angles_dedup, unique_indices = np.unique(angles, return_index=True)
+        speeds_dedup = np.array(speeds)[unique_indices]
+
         # Interpolate the data for smoother lines
-        cubic_interp = CubicSpline(angles, speeds, bc_type='natural')
+        cubic_interp = CubicSpline(angles_dedup, speeds_dedup, bc_type='natural')
         interpolated_angles = np.linspace(min(angles), max(angles), 500)
         interpolated_speeds = cubic_interp(interpolated_angles)
 
@@ -324,11 +328,6 @@ def plot_course_diagram_with_tack(A, B, TWD, polar_line, TWA_VMC, vmc_data):
     else:
         vmg_best_path = None
     print("vmg_best_path:",vmg_best_path)
-
-    # method VMC-fixed
-    # best_twa, best_sow = find_optimal_vmc((angles_full, speeds_full), TWA_VMC)
-
-    # method VMC-adapt
     
     # Plot the course diagram
     plt.figure(figsize=(8, 8))
@@ -351,7 +350,7 @@ def plot_course_diagram_with_tack(A, B, TWD, polar_line, TWA_VMC, vmc_data):
     if vmc_data['leg2']:
         leg1_dist_vmc = vmc_data['leg2']["distance_leg1"]
         leg2_dist_vmc = vmc_data['leg2']["distance_leg2"]
-        leg1_speed_vmc = vmc_data['leg1']['optimal_speed']
+        leg1_speed_vmc = vmc_data['leg2']['optimal_leg1_speed']
         leg2_speed_vmc = vmc_data['leg2']['optimal_leg2_speed']
         leg1_time_vmc = vmc_data['leg2']["distance_leg1"] / leg1_speed_vmc
         leg2_time_vmc = vmc_data['leg2']["distance_leg2"] / leg2_speed_vmc
@@ -426,27 +425,19 @@ def interpolate_polar_curve(polar_data, TWS):
 
     # Smooth the polar curve using cubic spline
     cubic_spline = CubicSpline(angles, interpolated_speeds, bc_type='natural')
-    num = int(max(angles) - min(angles)) + 1
+    num = 2*int(max(angles) - min(angles) + 1)
     smooth_angles = np.linspace(min(angles), max(angles), num)
     smooth_speeds = cubic_spline(smooth_angles)
 
     return smooth_angles, smooth_speeds
 
 
-# def find_optimal_vmc(polar_line, TWA_VMC=0):
-#     """
-#     Find the TWA and speed on the polar curve that maximize the VMC.
-#     """
-#     angles, speeds = polar_line
-#     vmcs = [speed * np.cos(np.radians(angle - TWA_VMC)) for angle, speed in zip(angles, speeds)]
-#     best_index = np.argmax(vmcs)
-#     return angles[best_index], speeds[best_index]
-
-def plot_polar_diagram(polar_line, TWA_VMC, TWS, vmc_data, margin = 2):
+def plot_polar_diagram(polar_line, TWA_VMC, TWS, vmc_data, margin = 5):
     """
     Plot the polar diagram with interpolated TWS curve for both port and starboard tacks,
     VMC lines, tangent lines, and legend details. Return optimal values for use in other functions.
     """
+    
     # polar_line = polars_full_rad['polar_line']
     angles_port, speeds_port = polar_line
 
@@ -502,16 +493,16 @@ def plot_polar_diagram(polar_line, TWA_VMC, TWS, vmc_data, margin = 2):
                 linestyle="--", color=color, label=rf"{label_prefix} ($TWA_{{hd}}={best_twa:.2f}°$, $VMC={best_vmc:.2f}$ kn)")
 
     # Port Tack
-    plot_vmc_and_tangent(ax, TWA_VMC, vmc_data['leg1']["optimal_twa_deg"], vmc_data['leg1']['optimal_speed'], vmc_data['leg1']['optimal_vmc'], "magenta", "Leg1")
+    plot_vmc_and_tangent(ax, TWA_VMC, np.degrees(vmc_data['leg2']["optimal_leg1_angle_rad"]), vmc_data['leg2']['optimal_leg1_speed'], vmc_data['leg2']['vmc1'], "magenta", "Leg1")
 
     # Starboard Tack
-    plot_vmc_and_tangent(ax, TWA_VMC, np.degrees(vmc_data['leg2']["optimal_leg2_angle_rad"]), vmc_data['leg2']['optimal_leg2_speed'], vmc_data['leg2']['optimal_vmc'], "magenta", "Leg2")
+    plot_vmc_and_tangent(ax, TWA_VMC, np.degrees(vmc_data['leg2']["optimal_leg2_angle_rad"]), vmc_data['leg2']['optimal_leg2_speed'], vmc_data['leg2']['vmc2'], "magenta", "Leg2")
 
 
 
     # Highlight optimal VMC points
-    ax.scatter([np.radians(vmc_data['leg1']['optimal_twa_deg']),vmc_data['leg2']['optimal_leg2_angle_rad']],
-               [vmc_data['leg1']['optimal_speed'],vmc_data['leg2']['optimal_leg2_speed']], 
+    ax.scatter([vmc_data['leg2']['optimal_leg1_angle_rad'],vmc_data['leg2']['optimal_leg2_angle_rad']],
+               [vmc_data['leg2']['optimal_leg1_speed'],vmc_data['leg2']['optimal_leg2_speed']], 
                color="magenta", label= "VMC-optmized Headings") #"Optimal Point (Leg 1)")
     # ax.scatter(vmc_data['leg2']['optimal_leg2_angle_rad'],vmc_data['leg2']['optimal_leg2_speed'], color="magenta", label= None) #"Optimal Point (Lwg 2)")
 
@@ -605,7 +596,7 @@ def preprocess_polar_data(polar_line, TWD):
         "bearings_full_rad": bearings_full_rad,
     }
 
-def calc_vmc_results(polars_full_rad, start_point, target_point, TWA_VMC,margin=2):
+def calc_vmc_results(polars_full_rad, start_point, target_point, TWA_VMC, margin=5):
     """
     Calculate VMC results for two legs and return data for optimized polar and course plots.
 
@@ -620,6 +611,7 @@ def calc_vmc_results(polars_full_rad, start_point, target_point, TWA_VMC,margin=
     """
     # Step 1: Select optimal leg1
     leg1 = find_optimal_vmc1(polars_full_rad, TWA_VMC)
+
 
     # Step 2: Optimize leg2
     leg2 = find_optimal_vmc2(start_point, target_point, leg1, polars_full_rad, TWA_VMC,margin=margin)
@@ -670,12 +662,13 @@ def find_optimal_vmc1(polars_full_rad, TWA_VMC=0):
     optimal_bearing_rad = bearings_rad[best_index]
     
     return {'optimal_twa_deg':optimal_twa_deg, 
+            'optimal_twa_rad':optimal_twa_rad, 
             'optimal_speed':optimal_speed, 
-            'optimal_vmc':optimal_vmc,
+            'optimal_vmc1':optimal_vmc,
             'optimal_bearing_rad':optimal_bearing_rad}
 
     
-def find_optimal_vmc2(start_point, target_point, leg1, polars_full_rad, TWA_VMC, margin=2):
+def find_optimal_vmc2(start_point, target_point, leg1, polars_full_rad, TWA_VMC, margin=5):
     """
     Calculate the optimal second leg for the VMC method.
 
@@ -692,17 +685,41 @@ def find_optimal_vmc2(start_point, target_point, leg1, polars_full_rad, TWA_VMC,
     # Convert TWA_VMC to radians    
     TWA_VMC_rad = np.radians(TWA_VMC)
 
-    ixs = filter_polar_points(polars_full_rad["angles_full_rad"], 
+    ixs1 = filter_polar_points_leg1(polars_full_rad["angles_full_rad"], 
                               TWA_VMC, np.radians(leg1["optimal_twa_deg"]), 
                               margin_deg=margin)
-    ixs = np.where(ixs)
-    print(len(ixs))
+    ixs1 = np.where(ixs1)
+    print(len(ixs1))
+
+    leg1_candidates = {
+        "ixs1_full":     ixs1,
+        "angles_rad":   polars_full_rad["angles_full_rad"][ixs1],
+        "speeds":       polars_full_rad["speeds_full"][ixs1],
+        "bearings_rad": polars_full_rad["bearings_full_rad"][ixs1]
+    }
+    # Protect against cases where no valid candidates are found
+    if len(leg1_candidates["angles_rad"]) == 0:
+        return {
+            "optimal_leg1_angle_rad": None,
+            "optimal_leg1_speed": None,
+            "intersection_point": None,
+            "total_elapsed_time": None,
+            "distance_leg1": None,
+            "distance_leg2": None,
+            "optimal_vmc1": None,
+        }
+
+    ixs2 = filter_polar_points_leg2(polars_full_rad["angles_full_rad"], 
+                              TWA_VMC, np.radians(leg1["optimal_twa_deg"]), 
+                              margin_deg=margin)
+    ixs2 = np.where(ixs2)
+    print(len(ixs2))
 
     leg2_candidates = {
-        "ixs_full":     ixs,
-        "angles_rad":   polars_full_rad["angles_full_rad"][ixs],
-        "speeds":       polars_full_rad["speeds_full"][ixs],
-        "bearings_rad": polars_full_rad["bearings_full_rad"][ixs]
+        "ixs2_full":     ixs2,
+        "angles_rad":   polars_full_rad["angles_full_rad"][ixs2],
+        "speeds":       polars_full_rad["speeds_full"][ixs2],
+        "bearings_rad": polars_full_rad["bearings_full_rad"][ixs2]
     }
     
     # Protect against cases where no valid candidates are found
@@ -714,53 +731,98 @@ def find_optimal_vmc2(start_point, target_point, leg1, polars_full_rad, TWA_VMC,
             "total_elapsed_time": None,
             "distance_leg1": None,
             "distance_leg2": None,
-            "optimal_vmc": None,
+            # "optimal_vmc": None,
         }
 
     # Compute VMC for leg2 candidates
-    vmcs_leg2 = leg2_candidates["speeds"] * np.cos(leg2_candidates["angles_rad"] - TWA_VMC_rad)
-
-    # Find the optimal VMC point
-    # best_idx = np.argmax(vmcs_leg2)
-
-    # optimal_vmc = vmcs_leg2[best_idx]
+    # vmcs_leg2 = leg2_candidates["speeds"] * np.cos(leg2_candidates["angles_rad"] - TWA_VMC_rad)
     
     # Compute distances and elapsed times
     delta_x = target_point[0] - start_point[0]
     delta_y = target_point[1] - start_point[1]
-    leg1_dx = leg1["optimal_speed"] * np.cos(leg1["optimal_bearing_rad"])
-    leg1_dy = leg1["optimal_speed"] * np.sin(leg1["optimal_bearing_rad"])
-    # leg2_dx = leg2_candidates["speeds"][best_idx] * np.cos(leg2_candidates["bearings_rad"][best_idx])
-    # leg2_dy = leg2_candidates["speeds"][best_idx] * np.sin(leg2_candidates["bearings_rad"][best_idx])
-    leg2_dxs = leg2_candidates["speeds"] * np.cos(leg2_candidates["bearings_rad"])
-    leg2_dys = leg2_candidates["speeds"] * np.sin(leg2_candidates["bearings_rad"])
 
-    dets = leg1_dx * leg2_dys - leg1_dy * leg2_dxs
+    leg1_dxs = (leg1_candidates["speeds"] * np.cos(leg1_candidates["bearings_rad"])).reshape(-1,1)
+    leg1_dys = (leg1_candidates["speeds"] * np.sin(leg1_candidates["bearings_rad"])).reshape(-1,1)
+
+    leg2_dxs = (leg2_candidates["speeds"] * np.cos(leg2_candidates["bearings_rad"])).reshape(-1,1)
+    leg2_dys = (leg2_candidates["speeds"] * np.sin(leg2_candidates["bearings_rad"])).reshape(-1,1)
+
+    dets = leg1_dxs * leg2_dys.T - leg1_dys * leg2_dxs.T + 1e-8 # to aoid div by zero
     # print('det = ',det)
-    t1 = (delta_x * leg2_dys - delta_y * leg2_dxs) / dets  #if det != 0 else 0
+    t1 = (delta_x * leg2_dys - delta_y * leg2_dxs).T / dets  #if det != 0 else 0
     # t2 = (-delta_x * leg1_dy + delta_y * leg1_dx) / dets #if det != 0 else 0
 
-    intersection_points = np.stack([start_point[0] + t1 * leg1_dx, 
-                                    start_point[1] + t1 * leg1_dy],
-                                    axis=1)
+    intersection_points = np.stack([start_point[0] + t1 * leg1_dxs, 
+                                    start_point[1] + t1 * leg1_dys],
+                                    axis=2)
 
-    distance_leg1 = np.linalg.norm(intersection_points - np.array(start_point), axis=1)
-    distance_leg2 = np.linalg.norm(np.array(target_point) - intersection_points, axis=1)
-    total_elapsed_times = distance_leg1 / leg1["optimal_speed"] + distance_leg2 / leg2_candidates["speeds"]
-    best_idx = np.argmin(total_elapsed_times)  
-
+    distance_leg1 = np.linalg.norm(intersection_points - np.array(start_point), axis=2)
+    distance_leg2 = np.linalg.norm(np.array(target_point) - intersection_points, axis=2)
+    total_elapsed_times = distance_leg1 / leg1_candidates["speeds"].reshape(-1,1) + distance_leg2 / leg2_candidates["speeds"]
+    # best_idx = np.argmin(total_elapsed_times)  
+    _best_idx1, _best_idx2= np.unravel_index(np.argmin(total_elapsed_times),total_elapsed_times.shape)
     # Return the result
     return {
-        "optimal_leg2_angle_rad": leg2_candidates["angles_rad"][best_idx],
-        "optimal_leg2_speed": leg2_candidates["speeds"][best_idx],
-        "intersection_point": intersection_points[best_idx],
-        "total_elapsed_time": total_elapsed_times[best_idx],
-        "distance_leg1": distance_leg1[best_idx],
-        "distance_leg2": distance_leg2[best_idx],
-        "optimal_vmc": vmcs_leg2[best_idx],
+        "optimal_leg1_angle_rad": leg1_candidates["angles_rad"][_best_idx1],
+        "optimal_leg1_speed": leg1_candidates["speeds"][_best_idx1],
+        "optimal_leg2_angle_rad": leg2_candidates["angles_rad"][_best_idx2],
+        "optimal_leg2_speed": leg2_candidates["speeds"][_best_idx2],
+        "intersection_point": intersection_points[_best_idx1,_best_idx2],
+        "total_elapsed_time": total_elapsed_times[_best_idx1,_best_idx2],
+        "distance_leg1": distance_leg1[_best_idx1,_best_idx2],
+        "distance_leg2": distance_leg2[_best_idx1,_best_idx2,],
+        "vmc1": leg1_candidates["speeds"][_best_idx1] * np.cos(leg1_candidates["angles_rad"][_best_idx1] - TWA_VMC_rad),
+        "vmc2": leg2_candidates["speeds"][_best_idx2] * np.cos(leg2_candidates["angles_rad"][_best_idx2] - TWA_VMC_rad),
     }
+
+def filter_polar_points_leg1(polar_angles, TWA_VMC, leg1_angle, margin_deg=5):
+    """
+    Filter polar spline points to select only the angles that:
+    (a) Are "towards" the TWA_VMC (avoiding headings away from the VMC direction).
+    (b) Lie on the same side of TWA_VMC as the leg1 angle.
+    (c) are not further away from |TWA_VMC - leg1_angle | + small margin .
+
+    Args:
+        polar_angles (np.ndarray): Array of polar angles in radians (e.g., 1000 points from the polar spline).
+        TWA_VMC (float): True Wind Angle for VMC direction in degrees.
+        leg1_angle (float): Angle of the selected leg1 point in radians.
+        margin_deg (float): to extend the range to improve coverage.
+
+    Returns:
+        np.ndarray: Boolean mask array of the same size as `polar_angles`.
+    """
+    # Convert inputs to radians and normalize
+    margin_rad = np.radians(margin_deg)
+    TWA_VMC_rad = np.mod(np.radians(TWA_VMC), 2 * np.pi)
+    leg1_angle = np.mod(leg1_angle, 2 * np.pi)
+    polar_angles = np.mod(polar_angles, 2 * np.pi)
+
+    # condition: leg1_angle is clockwise from TWA_VMC_rad 
+    _clockwise = np.mod(leg1_angle - TWA_VMC_rad, 2 * np.pi) < np.pi
+
+    # Define the exclusion range frin TWA_VMC
+
+    # Normalize limits to [0, 2π)
+
+    # Create mask for angles "towards" TWA_VMC
+    towards_vmc = np.cos(polar_angles - TWA_VMC_rad) > -0.25
+
+    # Create mask for "other side" of TWA_VMC relative to leg1
+    if _clockwise:
+        same_side = np.sin(polar_angles - TWA_VMC_rad) >= 0
+        inside_margin = polar_angles < np.mod(leg1_angle + margin_rad, 2 * np.pi)
+    else:
+        # Case: leg1 is counter-clockwise of TWA_VMC
+        same_side = np.sin(polar_angles - TWA_VMC_rad) <= 0
+        inside_margin = polar_angles > np.mod(leg1_angle - margin_rad, 2 * np.pi)
+
+    # Combine masks
+    valid_mask = towards_vmc & same_side # & inside_margin
+
+    return valid_mask
+
     
-def filter_polar_points(polar_angles, TWA_VMC, leg1_angle, margin_deg=2):
+def filter_polar_points_leg2(polar_angles, TWA_VMC, leg1_angle, margin_deg=2):
     """
     Filter polar spline points to select only the angles that:
     (a) Are "towards" the TWA_VMC (avoiding headings away from the VMC direction).
@@ -782,6 +844,9 @@ def filter_polar_points(polar_angles, TWA_VMC, leg1_angle, margin_deg=2):
     leg1_angle = np.mod(leg1_angle, 2 * np.pi)
     polar_angles = np.mod(polar_angles, 2 * np.pi)
 
+    # condition: leg1_angle is clockwise from TWA_VMC_rad 
+    _clockwise = np.mod(leg1_angle - TWA_VMC_rad, 2 * np.pi) <= np.pi
+
     # Define the exclusion range around TWA_VMC
     lower_limit = TWA_VMC_rad - margin_rad
     upper_limit = TWA_VMC_rad + margin_rad
@@ -791,24 +856,20 @@ def filter_polar_points(polar_angles, TWA_VMC, leg1_angle, margin_deg=2):
     upper_limit = np.mod(upper_limit, 2 * np.pi)
 
     # Create mask for angles "towards" TWA_VMC
-    towards_vmc = np.cos(polar_angles - TWA_VMC_rad) > 0
+    towards_vmc = np.cos(polar_angles - TWA_VMC_rad) > -0.25
 
     # Create mask for "other side" of TWA_VMC relative to leg1
-    
-
-    if np.mod(leg1_angle - TWA_VMC_rad, 2 * np.pi) < np.pi:
-    # if leg1_angle > TWA_VMC_rad:
-        # Case: leg1 is clockwise of TWA_VMC
-        other_side = np.sin(polar_angles - TWA_VMC_rad) < 0
+    if _clockwise:
+        other_side = np.sin(polar_angles - TWA_VMC_rad) <= 0
     else:
         # Case: leg1 is counter-clockwise of TWA_VMC
-        other_side = np.sin(polar_angles - TWA_VMC_rad) > 0
+        other_side = np.sin(polar_angles - TWA_VMC_rad) >= 0
 
     # Exclude angles within the margin around TWA_VMC
-    outside_margin = (polar_angles < lower_limit) | (polar_angles > upper_limit)
+    # outside_margin = (polar_angles < lower_limit) | (polar_angles > upper_limit)
 
     # Combine masks
-    valid_mask = towards_vmc & other_side & outside_margin
+    valid_mask = towards_vmc & other_side # & outside_margin
 
     return valid_mask
 
